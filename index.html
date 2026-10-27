@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تسجيل الحضور</title>
+<style>
+body{font-family:Tahoma,Arial,sans-serif;margin:0;background:#f4f6f8;color:#14213d}
+header{background:#0b3b3a;color:#fff;padding:16px}h1{margin:0;font-size:19px}
+.c{max-width:480px;margin:12px auto;padding:0 12px}.k{background:#fff;border-radius:14px;padding:14px}
+select,input{width:100%;box-sizing:border-box;font:inherit;font-size:16px;padding:11px;margin:6px 0;border:1px solid #ccd;border-radius:10px}
+video{width:100%;border-radius:12px;background:#000;transform:scaleX(-1);margin:6px 0}
+.r{display:flex;gap:10px}
+button{flex:1;border:0;color:#fff;font:inherit;font-weight:700;font-size:17px;padding:14px;border-radius:12px;background:#0f766e}
+button+button{background:#c2410c}button:disabled{opacity:.4}
+#m{text-align:center;padding:12px;font-weight:700;min-height:24px}
+</style>
+</head>
+<body>
+<header><h1>🕒 تسجيل الحضور والانصراف</h1><div id="st"></div></header>
+<div class="c"><div class="k">
+<select id="nm"><option value="">اختار اسمك…</option></select>
+<input id="pin" type="password" placeholder="الرقم السري للأمن" hidden>
+<video id="v" autoplay playsinline muted></video>
+<div class="r"><button onclick="go('حضور')">✅ حضور</button><button onclick="go('انصراف')">🚪 انصراف</button></div>
+<div id="m"></div>
+</div></div>
+<script>
+// ضع رابط الـ Web App هنا بعد النشر
+var API = 'https://script.google.com/macros/s/AKfycbzbdQA3Sxmv3-4BWqQnH_Jv0YRLYMD3ljdOtYn5osMV_gbL-6y2RPbBE44Qp6cpB4E/exec';
+var q = new URLSearchParams(location.search), site = q.get('site') || '', sec = q.get('mode') == 'security';
+function $(i){return document.getElementById(i)}
+function msg(t, ok){$('m').textContent = t; $('m').style.color = ok ? '#15803d' : '#b91c1c'}
+function done(t, ok){msg(t, ok); document.querySelectorAll('button').forEach(function(b){b.disabled = false})}
+$('st').textContent = '📍 ' + (site || 'موقع غير محدد') + (sec ? ' – وضع الأمن' : '');
+if (sec) $('pin').hidden = false;
+fetch(API).then(function(r){return r.json()}).then(function(d){
+  d.staff.forEach(function(s){var o = document.createElement('option'); o.value = s.n; o.textContent = s.n + ' – ' + s.r; $('nm').appendChild(o)});
+}).catch(function(){msg('مشكلة في الاتصال، حاول تاني')});
+navigator.mediaDevices.getUserMedia({video: {facingMode: sec ? 'environment' : 'user'}, audio: false})
+  .then(function(s){$('v').srcObject = s}).catch(function(){msg('لازم تسمح باستخدام الكاميرا')});
+function send(d){
+  fetch(API, {method: 'POST', headers: {'Content-Type': 'text/plain'}, body: JSON.stringify(d)})
+    .then(function(r){return r.json()})
+    .then(function(r){done(r.ok ? 'تم تسجيل ' + d.type + ' الساعة ' + r.time + ' ✅' : r.msg, r.ok)})
+    .catch(function(){done('مشكلة في الاتصال، حاول تاني')});
+}
+function go(type){
+  var nm = $('nm').value, v = $('v');
+  if (!nm) return msg('اختار اسمك الأول');
+  if (!v.videoWidth) return msg('الكاميرا مش شغالة');
+  msg('بيتم التسجيل…', true);
+  document.querySelectorAll('button').forEach(function(b){b.disabled = true});
+  var c = document.createElement('canvas'); c.width = 480; c.height = Math.round(480 * v.videoHeight / v.videoWidth);
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  var d = {name: nm, site: site, type: type, photo: c.toDataURL('image/jpeg', .7), pin: sec ? $('pin').value : ''};
+  navigator.geolocation.getCurrentPosition(function(p){d.lat = p.coords.latitude; d.lng = p.coords.longitude; send(d)},
+    function(){sec ? send(d) : done('لازم تسمح باللوكيشن')}, {enableHighAccuracy: true, timeout: 15000});
+}
+</script>
+</body>
+</html>
