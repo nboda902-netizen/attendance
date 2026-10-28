@@ -32,6 +32,7 @@ select,input{width:100%;font:inherit;font-size:16px;padding:12px;margin:4px 0;bo
 select:focus,input:focus{outline:0;border-color:var(--p)}
 .cam{position:relative;border-radius:14px;overflow:hidden;background:#0f172a;aspect-ratio:4/3}
 .cam video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.cam.rear video{transform:none}
 .cam i{position:absolute;inset:10% 27%;border:3px dashed #ffffffaa;border-radius:50%}
 .row{display:flex;gap:10px;margin-top:12px}
 button{flex:1;border:0;color:#fff;font:inherit;font-weight:700;font-size:18px;padding:15px 8px;border-radius:14px;background:var(--p);cursor:pointer;box-shadow:0 3px 8px #0f766e44}
@@ -68,6 +69,8 @@ button:disabled{opacity:.45}
 <div class="card">
 <div id="lg"><div class="lab">🛡️ دخول الأمن</div><input id="pin" type="password" placeholder="الرقم السري"><div class="row"><button id="go">دخول</button></div></div>
 <div id="vf" hidden>
+<div class="row" style="margin-bottom:10px"><button class="g" id="t1">🧾 الزوار</button><button class="g" id="t2">🧍 تسجيل موظف</button></div>
+<div id="pv">
 <div class="lab">🧾 تسجيل زائر – <span id="vs"></span></div>
 <select id="vt"><option>زائر</option><option>إدارة</option><option>مقاول / مورّد</option></select>
 <input id="vn" placeholder="اسم الزائر">
@@ -75,6 +78,16 @@ button:disabled{opacity:.45}
 <input id="vp" placeholder="جاي يقابل مين / الغرض">
 <div class="row"><button id="vin">✅ تسجيل دخول</button></div>
 <div class="lab" style="margin-top:14px">اللي جوه الموقع النهاردة</div><div id="vl"></div>
+</div>
+<div id="pe" hidden>
+<div class="lab">🧍 تسجيل موظف (نسي موبايله أو معهوش) – <span id="es"></span></div>
+<select id="en"></select>
+<a id="eall">اعرض كل الأسماء</a>
+<div class="cam" style="margin-top:8px"><video id="v2" autoplay playsinline muted></video><i></i></div>
+<div class="row"><button class="g" id="flip">🔄 قلب الكاميرا</button></div>
+<div class="row"><button id="ein">✅ حضور</button><button class="o" id="eout">🚪 انصراف</button></div>
+<div class="lab" style="margin-top:10px">صوّر الموظف نفسه قدام الكاميرا، وبيتسجل باسم الأمن.</div>
+</div>
 </div>
 <div class="msg" id="sm"></div>
 </div>
@@ -123,9 +136,16 @@ fetch(API).then(function(r){return r.json()}).then(function(d){
   if (site) {g.value = site; setSite(site, ''); g.hidden = true} else auto();
 }).catch(function(){msg('m', 'مشكلة في الاتصال، حاول تاني')});
 $('all').onclick = function(){fill(true)};
-if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) navigator.mediaDevices.getUserMedia({video: {facingMode: 'user'}, audio: false})
-  .then(function(s){$('v').srcObject = s}).catch(function(){msg('m', 'لازم تسمح باستخدام الكاميرا')});
-else msg('m', 'افتح الرابط من متصفح حديث (https) عشان الكاميرا تشتغل');
+var stream = null, facing = 'user';
+function startCam(mode){
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return msg('m', 'افتح الرابط من متصفح حديث (https) عشان الكاميرا تشتغل');
+  if (stream) stream.getTracks().forEach(function(t){t.stop()});
+  navigator.mediaDevices.getUserMedia({video: {facingMode: mode}, audio: false}).then(function(st){
+    stream = st; facing = mode; $('v').srcObject = st; $('v2').srcObject = st;
+    document.querySelectorAll('.cam').forEach(function(c){c.classList.toggle('rear', mode != 'user')});
+  }).catch(function(){msg('m', 'لازم تسمح باستخدام الكاميرا')});
+}
+startCam('user');
 function bt(on){document.querySelectorAll('#att button').forEach(function(b){b.disabled = !on})}
 function done(t, k){msg('m', t, k); bt(true)}
 function go(type){
@@ -145,7 +165,7 @@ function go(type){
 }
 // ===== الأمن والزوار =====
 $('sb').onclick = function(){$('att').hidden = true; $('sb').hidden = true; $('sec').hidden = false; $('bk').hidden = false};
-$('bk').onclick = function(){$('att').hidden = false; $('sb').hidden = false; $('sec').hidden = true; $('bk').hidden = true};
+$('bk').onclick = function(){if (facing != 'user') startCam('user'); $('att').hidden = false; $('sb').hidden = false; $('sec').hidden = true; $('bk').hidden = true};
 $('go').onclick = function(){
   if (!site) return msg('sm', 'اختار الموقع الأول من صفحة الحضور');
   pin = $('pin').value;
@@ -171,6 +191,29 @@ function vlist(){
     });
   });
 }
+// ===== تسجيل موظف بواسطة الأمن (بالصورة، من غير فحص اللوكيشن) =====
+function fillE(all){
+  var n = $('en'), l = S.filter(function(s){return all || (site && String(s.s).trim() == site)});
+  n.innerHTML = '<option value="">اختار الموظف…</option>';
+  l.forEach(function(s){var o = document.createElement('option'); o.value = s.n; o.textContent = s.n + (s.c ? ' – ' + s.c : '') + (all ? ' – ' + s.s : ''); n.appendChild(o)});
+}
+$('t1').onclick = function(){$('pv').hidden = false; $('pe').hidden = true; msg('sm', ''); if (facing != 'user') startCam('user')};
+$('t2').onclick = function(){$('pv').hidden = true; $('pe').hidden = false; msg('sm', ''); $('es').textContent = site; fillE(false); startCam('environment')};
+$('eall').onclick = function(){fillE(true)};
+$('flip').onclick = function(){startCam(facing == 'user' ? 'environment' : 'user')};
+function esend(type){
+  var n = $('en').value, v = $('v2');
+  if (!n) return msg('sm', 'اختار الموظف الأول');
+  if (!v.videoWidth) return msg('sm', 'الكاميرا مش شغالة');
+  msg('sm', 'بيتم التسجيل…', 'wait');
+  var c = document.createElement('canvas'); c.width = 480; c.height = Math.round(480 * v.videoHeight / v.videoWidth);
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  post({name: n, site: site, type: type, photo: c.toDataURL('image/jpeg', .7), pin: pin}).then(function(r){
+    msg('sm', r.ok ? 'تم تسجيل ' + type + ' ' + n + ' الساعة ' + r.time + ' ✅' : r.msg, r.ok ? 'ok' : 'err');
+  }).catch(function(){msg('sm', 'مشكلة في الاتصال، حاول تاني')});
+}
+$('ein').onclick = function(){esend('حضور')};
+$('eout').onclick = function(){esend('انصراف')};
 // ===== تثبيت التطبيق على الشاشة الرئيسية =====
 var dp = null;
 function isApp(){return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone}
